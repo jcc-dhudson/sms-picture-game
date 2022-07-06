@@ -91,6 +91,7 @@ def list(refresh=False):
 
     return jsonify(people)
 
+
 @app.route('/groups')
 def groups(refresh=False):
     if not session.get("access_token") or session.get("access_token") not in app.users:
