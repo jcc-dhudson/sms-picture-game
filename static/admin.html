@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="" />
+    <meta name="author" content="" />
+    <title>Bus Roster</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="img/favicon-16x16.png">
+    <link rel="manifest" href="img/site.webmanifest">
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.20.2/dist/bootstrap-table.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.14.1/css/ol.css">
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.14.1/build/ol.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    <link href="css/fresh-bootstrap-table.css" rel="stylesheet" />
+    <link href="css/common.css" rel="stylesheet" />
+
+    <!--     Fonts and icons     -->
+    <script src="https://kit.fontawesome.com/071fa69033.js" crossorigin="anonymous"></script>
+    <link href='https://fonts.googleapis.com/css?family=Roboto:400,700,300' rel='stylesheet' type='text/css'>
+</head>
+<body id="page-top">
+    <div class="modal fade" id="groupModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="groupModal-title">Group</h5>
+            </div>
+            <div class="modal-body">
+              <div class="d-grid gap-2" id="groupModal-body">
+              </div>
+            </div>
+            <div class="modal-footer" id="menuModal-footer">
+              <button type="button" id="scanAllow" class="btn btn-secondary btn-block" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal fade" id="menuModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="menuModal-title">Menu</h5>
+            </div>
+            <div id="menuModal-body" class="modal-body">
+              <div class="d-grid gap-2">
+                <button class="btn btn-primary" id="nav-checkin" type="button">Check-In</button>
+                <button class="btn btn-primary" id="nav-myGroup" type="button">My Group</button>
+                <button class="btn btn-primary" id="nav-viewEvents" type="button">View Events</button>
+                <button class="btn btn-primary" id="nav-writeTags" type="button">Write Tags</button>
+                <button class="btn btn-primary" id="nav-restart" type="button">Restart Check-In</button>
+              </div>
+            </div>
+            <div class="modal-footer" id="menuModal-footer">
+              <button type="button" id="scanAllow" class="btn btn-secondary btn-block" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <div class="fresh-table full-screen-table toolbar-color-azure">
+        <!--    Available colors for the full background: full-color-blue, full-color-azure, full-color-green, full-color-red, full-color-orange
+                Available colors only for the toolbar: toolbar-color-blue, toolbar-color-azure, toolbar-color-green, toolbar-color-red, toolbar-color-orange
+        -->
+        <div class="toolbar">
+            <button id="alertBtn" class="btn btn-default"><i class="fa-solid fa-bars"></i> Menu</button>
+        </div>
+            <table id="fresh-table" class="table" data-url="/list">
+                <thead>
+                    <th data-field="avatar" data-formatter="avatarFormatter" data-sortable="false">Avatar</th>
+                    <th data-field="person_name"  data-sortable="true">Name</th>
+                    <th data-field="group_name" data-formatter="groupFormatter" data-events="operateGroup" data-sortable="true">Group</th>
+                    <th data-field="sortby" data-visible="false" data-sortable="true">sortby</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+        </div>
+
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/bootstrap-table@1.20.2/dist/bootstrap-table.min.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
