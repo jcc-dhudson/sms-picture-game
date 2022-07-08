@@ -22,29 +22,30 @@
     <link href='https://fonts.googleapis.com/css?family=Roboto:400,700,300' rel='stylesheet' type='text/css'>
 </head>
 <body id="page-top">
-    <div class="modal fade" id="groupModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal fade" id="scoreModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="groupModal-title">Group</h5>
+              <h5 class="modal-title" id="scoreModal-title">Score</h5>
             </div>
             <div class="modal-body">
-              <div class="d-grid gap-2" id="groupModal-body">
+              <div class="d-grid gap-2" id="scoreModal-body">
+              </div>
+              <div class="input-group mb-3" style="padding-top: 20px">
+                <input id="newScore" class="form-control form-control-lg" type="number" placeholder="0" aria-label=".form-control-lg example">
+                <button type="button" id="setScore" class="btn btn-secondary btn-block">Set Score</button>
               </div>
             </div>
-            <div class="modal-footer" id="menuModal-footer">
-              <button type="button" id="scanAllow" class="btn btn-secondary btn-block" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer" id="scoreModal-footer">
+              <button type="button" id="downloadOriginal" class="btn btn-secondary btn-block">Download Original</button>
+              <button type="button" class="btn btn-secondary btn-block" data-bs-dismiss="modal">Cancel</button>
             </div>
           </div>
         </div>
       </div>
-      
-      
       <include src="modal-menu.html"></include>
-      <include src="modal-createGroup.html"></include>
       <include src="modal-send.html"></include>
       <include src="modal-leaderboard.html"></include>
-
     <div class="fresh-table full-screen-table toolbar-color-azure">
         <!--    Available colors for the full background: full-color-blue, full-color-azure, full-color-green, full-color-red, full-color-orange
                 Available colors only for the toolbar: toolbar-color-blue, toolbar-color-azure, toolbar-color-green, toolbar-color-red, toolbar-color-orange
@@ -52,11 +53,14 @@
         <div class="toolbar">
             <button id="alertBtn" class="btn btn-default"><i class="fa-solid fa-bars"></i> Menu</button>
         </div>
-            <table id="fresh-table" class="table" data-url="/list">
+            <table id="fresh-table" class="table" data-url="/getsubmissions">
                 <thead>
-                    <th data-field="avatar" data-formatter="avatarFormatter" data-sortable="false">Avatar</th>
+                    <th data-field="round" data-formatter="roundFormatter" data-events="operateRound" data-sortable="true">Round</th>
+                    
+                    <th data-field="group_name" data-formatter="groupFormatter" data-sortable="true">Group</th>
                     <th data-field="person_name"  data-sortable="true">Name</th>
-                    <th data-field="group_name" data-formatter="groupFormatter" data-events="operateGroup" data-sortable="true">Group</th>
+                    <th data-field="score">Score</th>
+                    <th data-field="status" data-formatter="statusFormatter" data-events="operateStatus" data-sortable="true">Status</th>
                     <th data-field="sortby" data-visible="false" data-sortable="true">sortby</th>
                 </thead>
                 <tbody>
@@ -69,6 +73,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/bootstrap-table@1.20.2/dist/bootstrap-table.min.js"></script>
     <script src="js/actions.js"></script>
-    <script src="js/admin.js"></script>
+    <script src="js/submissions.js"></script>
 </body>
 </html>

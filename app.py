@@ -1,15 +1,18 @@
 import json
 import sys
 import os
+import io
 import pypco
 import requests
-from secrets import token_urlsafe
+from secrets import token_urlsafe, token_hex
 from pytz import timezone
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, render_template, request, send_from_directory, session, redirect
+from flask import Flask, jsonify, render_template, request, send_from_directory, session, redirect, make_response, send_file
 from requests_oauth2 import OAuth2BearerToken, OAuth2
 from azure.communication.sms import SmsClient
 from azure.cosmos import CosmosClient
+from azure.storage.blob import BlobClient, generate_blob_sas, BlobSasPermissions, generate_container_sas, BlobServiceClient
+
 
 etc = timezone('America/New_York')
 DATABASE_NAME = 'sms-picture-game'
@@ -33,8 +36,12 @@ try:
     FROM_PHONE = os.environ['FROM_PHONE']
     ADMIN_LIST_ID = os.environ['ADMIN_LIST_ID']
     PLAYER_LIST_ID = os.environ['PLAYER_LIST_ID']
+    BLOB_ACCOUNT_NAME = os.environ['BLOB_ACCOUNT_NAME']
+    BLOB_ACCOUNT_KEY = os.environ['BLOB_ACCOUNT_KEY']
+    BLOB_CONTAINER_NAME = os.environ['BLOB_CONTAINER_NAME']
+    BLOB_BASE_URI = os.environ['BLOB_BASE_URI']
 except Exception as e:
-    print(f"Must supply PCO_APP_ID, PCO_SECRET, PCO_OAUTH_CLIEND_ID, COSMOS_KEY, COSMOS_URL, PCO_OAUTH_SECRET, PUBSUB_CONNECTION_STRING as environment vairables. - {e}")
+    print(f"Must supply {e} as environment vairable.")
     sys.exit(1)
 
 pco_auth = PlanningCenterClient(
@@ -47,27 +54,34 @@ sms_client = SmsClient.from_connection_string(SMS_CONNECTION_STRING, logging_ena
 
 app = Flask(__name__,
             static_url_path='', 
-            static_folder='static',)
+            static_folder='static/dist',)
 app.secret_key = token_urlsafe()
 app.tokens = {}
 app.users = {}
+app.round = token_hex(2)
+print(app.round)
 
 cosmos = CosmosClient(COSMOS_URL, credential=COSMOS_KEY)
 database = cosmos.get_database_client(DATABASE_NAME)
-groupMembersContainer = database.get_container_client('group-members')
+container = database.get_container_client('group-members')
 
 pco = pypco.PCO(PCO_APP_ID, PCO_SECRET)
 
-@app.route('/')
-def index():
+@app.route('/admin')
+def adminPage():
     if not session.get("access_token") or session.get("access_token") not in app.users:
         return redirect("/auth/callback")
     return app.send_static_file('admin.html')
 
+@app.route('/submissions')
+def submissionsPage():
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    return app.send_static_file('submissions.html')
 
 
 @app.route('/list')
-def list(refresh=False):
+def listPeople(refresh=False):
     if not session.get("access_token") or session.get("access_token") not in app.users:
         return redirect("/auth/callback")
     user = app.users[session.get("access_token")]
@@ -83,7 +97,7 @@ def list(refresh=False):
         outP['person_name'] = person['attributes']['name']
         outP['person_avatar'] = person['attributes']['avatar']
         outP['person_uri'] = person['links']['self']
-        group_results = groupMembersContainer.query_items(f"SELECT * FROM g WHERE array_contains(g.members, {int(person['id'])})", enable_cross_partition_query=True)
+        group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group" AND array_contains(g.members, {int(person["id"])})', enable_cross_partition_query=True)
         for group in group_results:
             outP['group_name'] = group['name']
             outP['group_id'] = group['id']
@@ -91,13 +105,74 @@ def list(refresh=False):
 
     return jsonify(people)
 
+@app.route('/getsubmissions')
+def getsubmissions():
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    user = app.users[session.get("access_token")]
+    if request.args.get('excludedone') and request.args.get('excludedone') == 'true':
+        sub_results = container.query_items(f'SELECT * FROM s WHERE s.type="submission" and s.score == 0', enable_cross_partition_query=True)
+    else:
+        sub_results = container.query_items(f'SELECT * FROM s WHERE s.type="submission"', enable_cross_partition_query=True)
+    outArr = []
+    for sub in sub_results:
+        transform = {
+            'kind': 'unknown',
+            'thumbnail': 'none',
+            'status': 'not_read'
+        }
+        trans_results = container.query_items(f'SELECT * FROM t WHERE t.type="transform" and t.token = "{sub["token"]}"', enable_cross_partition_query=True)
+        for trans in trans_results:
+            transform = trans
+            transform['status'] = 'done'
+        sub['transform'] = transform
+        if transform['status'] == 'done' and sub['status'] != 'Scored':
+            sub['status'] = 'Ready'
 
-@app.route('/groups')
-def groups(refresh=False):
+        outArr.append(sub)
+
+    return jsonify(outArr)
+        
+
+@app.route('/groups', methods = ['GET'])
+def groups():
     if not session.get("access_token") or session.get("access_token") not in app.users:
         return redirect("/auth/callback")
 
-    group_results = groupMembersContainer.query_items(f"SELECT * FROM g", enable_cross_partition_query=True)
+    group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group"', enable_cross_partition_query=True)
+    out = []
+    for group in group_results:
+        out.append({
+            'group_name': group['name'],
+            'group_id': group['id'],
+            'members': group['members']
+        })
+    return jsonify(out)
+
+@app.route('/groups', methods = ['POST'])
+def createGroup():
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    data = request.json
+    group = {
+        'id': token_urlsafe(10),
+        'name': data['name'],
+        'type': 'group',
+        'members': []
+    }
+    container.upsert_item(group)
+    return jsonify(group)
+
+@app.route('/groups', methods = ['DELETE'])
+def deleteGroups():
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    data = request.json
+    group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group"', enable_cross_partition_query=True)
+    for group in group_results:
+        if len(group['members']) == 0:
+            container.delete_item(item=group, partition_key=group['id'])
+    group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group"', enable_cross_partition_query=True)
     out = []
     for group in group_results:
         out.append({
@@ -116,7 +191,7 @@ def assigngroup(refresh=False):
     group_id = data['group_id']
     person_id = data['person_id']
     # First, delete
-    group_results = groupMembersContainer.query_items("SELECT * FROM g WHERE array_contains(g.members, @person_id)", parameters=[{'name': '@person_id', 'value': person_id}], enable_cross_partition_query=True)
+    group_results = container.query_items("SELECT * FROM g WHERE g.type=\"group\" AND array_contains(g.members, @person_id)", parameters=[{'name': '@person_id', 'value': person_id}], enable_cross_partition_query=True)
     for group in group_results:
         newGroup = group
         members = newGroup['members']
@@ -124,41 +199,143 @@ def assigngroup(refresh=False):
             members.remove(person_id)
             newGroup['members'] = members
             print(newGroup)
-            groupMembersContainer.replace_item(item=group, body=newGroup)
+            container.replace_item(item=group, body=newGroup)
 
     # Now, add
-    group_results = groupMembersContainer.query_items('SELECT * FROM g WHERE g.id=@group_id', parameters=[{'name': '@group_id', 'value': str(group_id)}], enable_cross_partition_query=True)
+    group_results = container.query_items('SELECT * FROM g WHERE g.type=\"group\" AND g.id=@group_id', parameters=[{'name': '@group_id', 'value': str(group_id)}], enable_cross_partition_query=True)
     for group in group_results:
         print(group)
         newGroup = group
         newGroup['members'].append(person_id)
-        groupMembersContainer.replace_item(item=group, body=newGroup)
+        container.replace_item(item=group, body=newGroup)
 
     return 'ok'
 
 
-@app.route('/sendselfcheckin', methods = ['POST'])
-def sendSelfCheckin(id=None):
+@app.route('/sendtoken', methods = ['POST'])
+def sendtoken(id=None):
     if not session.get("access_token") or session.get("access_token") not in app.users:
         return redirect("/auth/callback")
     user = app.users[session.get("access_token")]
     data = request.json
+    max_uploads = 0
+    if data['max_uploads'] != '':
+        max_uploads = int(data['max_uploads'])
+    # check for duplicate round
+    while True:
+        app.round = token_hex(2)
+        roundColide = list( container.query_items(f'SELECT * FROM s WHERE s.type="submission" and s.round = "{app.round}"', enable_cross_partition_query=True) )
+        if len(roundColide) == 0:
+            break;
+    
+    outHtml = ''
     for id in data['ids']:
         phoneResp = pco.get(f"/people/v2/people/{id}/phone_numbers")
         for phoneResp in phoneResp['data']:
             phone = phoneResp['attributes']
             if (phone['location'] == 'Mobile'): # must be a mobile phone number in PCO
                 if(phone['e164'] != 'None'):
-                    for i in app.list:
-                        if i['id'] == id:
-                            person = i
-                    if person:
-                        token = token_urlsafe(8)
-                        app.tokens[token] = person
-                        txt = f"{data['message']} \n"
-                        txt += f"{SELF_BASE_URL}/play/{token}"
-                        print(f"{person['name']}: {txt}")
-                        #sms_response = sms_client.send( from_=FROM_PHONE, to=[phone['e164']], message=txt )
+                    personResp = pco.get(f"/people/v2/people/{id}")
+                    person = personResp['data']
+                    group_results = container.query_items('SELECT * FROM g WHERE g.type="group" and array_contains(g.members, @person_id)', parameters=[{'name': '@person_id', 'value': int(id)}], enable_cross_partition_query=True)
+                    group = {}
+                    for g in group_results:
+                        group = g
+                    if group:
+                        if person and 'attributes' in person:
+                            token = token_urlsafe(8)
+                            personObj = {
+                                'person_id': id,
+                                'person_name': person['attributes']['name'],
+                                'group_name': group['name'],
+                                'group_id': group['id'],
+                                'expiration': datetime.utcnow() + timedelta(hours=12),
+                                'max_uploads': max_uploads,
+                                'round': app.round
+                            }
+                            app.tokens[token] = personObj
+                            txt = f"{data['message']} \n"
+                            txt += f"{SELF_BASE_URL}/p/{token}"
+                            print(f"{personObj['person_name']}: {txt}")
+                            outHtml += f"{group['name']} / {personObj['person_name']} / {phone['e164']}<br />"
+                            #sms_response = sms_client.send( from_=FROM_PHONE, to=[phone['e164']], message=txt )
+    return outHtml
+
+
+@app.route('/setscore/<token>', methods = ['POST'])
+def setscore(token):
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    data = request.json
+    submission_results = container.query_items('SELECT * FROM s WHERE s.type="submission" AND s.token=@token', parameters=[{'name': '@token', 'value': str(token)}], enable_cross_partition_query=True)
+    for sub in submission_results:
+        newSub = sub
+        newSub['score'] = int(data['score'])
+        newSub['status'] = 'Scored'
+        container.replace_item(item=sub, body=newSub)
+    return 'ok.'
+
+
+@app.route('/getscores', methods = ['GET'])
+def getscores():
+    if request.args.get('token') and request.args.get('token') in app.tokens:
+        return 'unauthorized', 403
+    # later, make this a legit join query
+    group_results = container.query_items('SELECT * FROM g WHERE g.type="group"', enable_cross_partition_query=True)
+    submission_results = list(container.query_items('SELECT * FROM s WHERE s.type="submission" AND s.score != 0', enable_cross_partition_query=True))
+    groups = []
+    for group in group_results:
+        group['score'] = 0
+        for submission in submission_results:
+            if group['id'] == submission['group_id']:
+                group['score'] += int(submission['score'])
+        groups.append(group)
+    #groups = sorted(groups, key = lambda item: item['score'], reverse=True)
+    return jsonify(groups)
+    
+
+    
+
+@app.route('/getsasuri', methods = ['GET'])
+def getsas():
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    
+    if request.args.get('rel'):
+        splitIn = request.args.get('rel').split('/')
+        container = splitIn[0]
+        filename = splitIn[1]
+        
+        if container == 'thumbs' or container == 'uploads':
+            sas_blob = generate_blob_sas(
+                account_name=BLOB_ACCOUNT_NAME,
+                container_name=container,
+                account_key=BLOB_ACCOUNT_KEY,
+                blob_name=filename,
+                permission=BlobSasPermissions(read=True),
+                expiry=datetime.utcnow() + timedelta(hours=4)
+            )
+            return f"{BLOB_BASE_URI}{container}/{filename}?{sas_blob}"
+        else:
+            return "Must supply correct container name", 403
+    elif request.args.get('download'):
+        sas_blob = generate_blob_sas(
+                account_name=BLOB_ACCOUNT_NAME,
+                container_name='uploads',
+                account_key=BLOB_ACCOUNT_KEY,
+                blob_name=request.args.get('download'),
+                permission=BlobSasPermissions(read=True),
+                expiry=datetime.utcnow() + timedelta(hours=4)
+            )
+        response = requests.get(f"{BLOB_BASE_URI}uploads/{request.args.get('download')}?{sas_blob}", stream=True)
+        return send_file(
+            io.BytesIO(response.content),
+            mimetype='image/jpeg',
+            as_attachment=True,
+            download_name=request.args.get('filename'))
+
+
+
 
 
 @app.route("/auth/callback")
@@ -199,11 +376,88 @@ def pco_oauth2callback():
         user['passed_background_check'] = d['data']['attributes']['passed_background_check']
         user['self'] = d['data']['links']['self']
         app.users[data.get("access_token")] = user
-        return redirect("/")
+        return redirect("/admin")
     else:
         return "unauthorized", 403
 
+#
+# Player routes
+#
+@app.route('/p/<token>')
+def play(token):
+    return app.send_static_file('play.html')
 
+@app.route('/playertoken/<token>')
+def playertoken(token=None):
+    if token and token not in app.tokens:
+        print(f"{token} is not a valid token")
+        return 'Invalid token', 403
+    user = app.tokens[token]
+    if user['expiration'] <= datetime.utcnow(): 
+        print(f"{token} is expired: {app.tokens[token]['expiration']}")
+        return 'Invalid token', 403
+    groupUploadCount = 0
+    if user['max_uploads'] > 0:
+        sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
+        for sub in sub_results:
+            groupUploadCount += 1
+
+    sas_blob = generate_blob_sas(
+        account_name=BLOB_ACCOUNT_NAME,
+        container_name=BLOB_CONTAINER_NAME,
+        account_key=BLOB_ACCOUNT_KEY,
+        blob_name=token,
+        permission=BlobSasPermissions(write=True),
+        expiry=datetime.utcnow() + timedelta(hours=2)
+    )
+    blob_url = 'https://'+BLOB_ACCOUNT_NAME+'.blob.core.windows.net/?'+sas_blob
+
+    
+    personObj = {
+        'person_name': user['person_name'],
+        'group_name': user['group_name'],
+        'group_upload_count': groupUploadCount,
+        'group_upload_max': user['max_uploads'],
+        'sas': blob_url
+    }
+    return personObj
+
+@app.route('/submit/<token>', methods = ['POST'])
+def submit(token=None):
+    if token and token not in app.tokens:
+        return 'Invalid token', 403
+    user = app.tokens[token]
+    if user['expiration'] <= datetime.utcnow(): 
+        return 'Invalid token', 403
+    data = request.json
+
+    
+    groupUploadCount = 0
+    if user['max_uploads'] > 0:
+        sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
+        for sub in sub_results:
+            groupUploadCount += 1
+    if groupUploadCount >= user['max_uploads']:
+        return 'Maximum uploads for group reached.', 418
+    
+    uri = BLOB_BASE_URI + BLOB_CONTAINER_NAME + '/' + token
+    out = {
+        'id': token + "_" + str(datetime.utcnow()),
+        'token': token,
+        'person_id': user['person_id'],
+        'person_name': user['person_name'],
+        'group_id': user['group_id'],
+        'group_name': user['group_name'],
+        'submission_uri': uri,
+        'original_filename': data['filename'],
+        'score': 0,
+        'round': user['round'],
+        'type': 'submission',
+        'time': str(datetime.utcnow()),
+        'status': 'Not ready'
+    }
+    container.upsert_item(out)
+    return 'ok.'
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)

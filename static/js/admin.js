@@ -61,7 +61,6 @@ $('button').click(function() {
 // table formatters
 //
 function groupFormatter(value, row, index) {
-    console.log(row)
     return '<button type="button" class="btn btn-outline-primary setGroup">'+value+'</button>'
 }
 function timeFormatter(value, row, index) {

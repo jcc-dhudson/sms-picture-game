@@ -4,5 +4,6 @@ requests_oauth2
 requests
 flask_socketio
 azure.communication.sms
+azure.storage.blob
 pytz
 azure.cosmos

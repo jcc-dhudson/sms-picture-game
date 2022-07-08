@@ -1,0 +1,29 @@
+<div class="modal fade" id="sendModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="sendModal-title">Send New Prompt</h5>
+        </div>
+        <div class="modal-body">
+          <div class="d-grid gap-2" id="sendModal-body">
+            <form>
+            <label for="sendMessageInput" class="form-label">Message</label>
+            <textarea class="form-control" id="sendMessageInput" rows="3"></textarea>
+            <label for="sendMessageInput" class="form-label">+ URL appended to the end</label>
+            <label for="sendMaxUploads" class="form-label">Max uploads per group (0 for no max)</label>
+            <div class="input-group mb-3">
+              <span class="input-group-text">#</span>
+              <input type="number" class="form-control" id="sendMaxUploads" value="1" aria-label="Max Uploads">
+            </div>
+          </form>
+          </div>
+        </div>
+        <div class="modal-footer" id="sendModal-footer">
+          
+          <button type="button" class="btn btn-secondary btn-block" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" id="sendMessageButton" class="btn btn-secondary btn-block">Send!</button>
+        
+        </div>
+      </div>
+    </div>
+  </div>
