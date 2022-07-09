@@ -108,6 +108,8 @@ def listPeople(refresh=False):
         outP['person_name'] = person['attributes']['name']
         outP['person_avatar'] = person['attributes']['avatar']
         outP['person_uri'] = person['links']['self']
+        outP['group_name'] = 'Unassigned'
+        outP['group_id'] = 'groupunassigneddefault'
         group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group" AND array_contains(g.members, {int(person["id"])})', enable_cross_partition_query=True)
         for group in group_results:
             outP['group_name'] = group['name']
@@ -181,7 +183,7 @@ def deleteGroups():
     data = request.json
     group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group"', enable_cross_partition_query=True)
     for group in group_results:
-        if len(group['members']) == 0:
+        if len(group['members']) == 0 and group['id'] != 'groupunassigneddefault':
             container.delete_item(item=group, partition_key=group['id'])
     group_results = container.query_items(f'SELECT * FROM g WHERE g.type="group"', enable_cross_partition_query=True)
     out = []
@@ -246,12 +248,16 @@ def sendtoken(id=None):
             phone = phoneResp['attributes']
             if (phone['location'] == 'Mobile'): # must be a mobile phone number in PCO
                 if(phone['e164'] != 'None'):
+                    
                     personResp = pco.get(f"/people/v2/people/{id}")
                     person = personResp['data']
-                    group_results = container.query_items('SELECT * FROM g WHERE g.type="group" and array_contains(g.members, @person_id)', parameters=[{'name': '@person_id', 'value': int(id)}], enable_cross_partition_query=True)
-                    group = {}
-                    for g in group_results:
-                        group = g
+                    print("trying "+ person['attributes']['name'])
+                    group_results = list(container.query_items('SELECT * FROM g WHERE g.type="group" and array_contains(g.members, @person_id)', parameters=[{'name': '@person_id', 'value': int(id)}], enable_cross_partition_query=True))
+                    if len(list(group_results)) == 0:
+                        print("no group for "+ person['attributes']['name'])
+                        group_results = list(container.query_items('SELECT * FROM g WHERE g.type="group" and g.id = "groupunassigneddefault"', enable_cross_partition_query=True))
+                    group = group_results[0]
+
                     if group:
                         if person and 'attributes' in person:
                             token = token_urlsafe(8)
@@ -265,6 +271,7 @@ def sendtoken(id=None):
                                 'max_uploads': max_uploads,
                                 'round': app.round
                             }
+                            print(personObj)
                             app.tokens[token] = personObj
                             personObj['token'] = token
                             personObj['type'] = 'token'
@@ -320,7 +327,8 @@ def getscores():
         for submission in submission_results:
             if group['id'] == submission['group_id']:
                 group['score'] += int(submission['score'])
-        groups.append(group)
+        if group['score'] != 0:
+            groups.append(group)
     #groups = sorted(groups, key = lambda item: item['score'], reverse=True)
     return jsonify(groups)
     
