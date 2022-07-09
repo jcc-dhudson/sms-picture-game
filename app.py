@@ -2,6 +2,7 @@ import json
 import sys
 import os
 import io
+from uuid import uuid4
 import pypco
 import requests
 from secrets import token_urlsafe, token_hex
@@ -69,6 +70,9 @@ print(app.round)
 cosmos = CosmosClient(COSMOS_URL, credential=COSMOS_KEY)
 database = cosmos.get_database_client(DATABASE_NAME)
 container = database.get_container_client('group-members')
+active_tokens = container.query_items("SELECT * FROM t WHERE t.type = \"token\"", enable_cross_partition_query=True)
+for token in active_tokens:
+    app.tokens[token['token']] = token
 
 queue_client = QueueClient.from_connection_string(QUEUE_CONNECTION_STRING, QUEUE_NAME)
 
@@ -251,16 +255,23 @@ def sendtoken(id=None):
                     if group:
                         if person and 'attributes' in person:
                             token = token_urlsafe(8)
+                            expTime = datetime.utcnow() + timedelta(hours=12)
                             personObj = {
                                 'person_id': id,
                                 'person_name': person['attributes']['name'],
                                 'group_name': group['name'],
                                 'group_id': group['id'],
-                                'expiration': datetime.utcnow() + timedelta(hours=12),
+                                'expiration': expTime.isoformat(),
                                 'max_uploads': max_uploads,
                                 'round': app.round
                             }
                             app.tokens[token] = personObj
+                            personObj['token'] = token
+                            personObj['type'] = 'token'
+                            personObj['id'] = str(uuid4())
+                            container.upsert_item(personObj)
+
+
                             txt = f"{data['message']} \n"
                             txt += f"{SELF_BASE_URL}/p/{token}"
                             print(f"{personObj['person_name']}: {txt}")
@@ -413,7 +424,7 @@ def playertoken(token=None):
         print(f"{token} is not a valid token")
         return 'Invalid token', 403
     user = app.tokens[token]
-    if user['expiration'] <= datetime.utcnow(): 
+    if datetime.fromisoformat(user['expiration']) <= datetime.utcnow(): 
         print(f"{token} is expired: {app.tokens[token]['expiration']}")
         return 'Invalid token', 403
     groupUploadCount = 0
@@ -447,7 +458,7 @@ def submit(token=None):
     if token and token not in app.tokens:
         return 'Invalid token', 403
     user = app.tokens[token]
-    if user['expiration'] <= datetime.utcnow(): 
+    if datetime.fromisoformat(user['expiration']) <= datetime.utcnow(): 
         return 'Invalid token', 403
     data = request.json
 
@@ -478,6 +489,11 @@ def submit(token=None):
         'status': 'Not ready'
     }
     container.upsert_item(out)
+    delete_token = container.query_items("SELECT * FROM t WHERE t.type = \"token\" and t.token = @token", parameters=[{'name': '@token', 'value': token}], enable_cross_partition_query=True)
+    for token in delete_token:
+        container.delete_item(item=token, partition_key=token['id'])
+    
+
     return 'ok.'
 
 if __name__ == '__main__':
