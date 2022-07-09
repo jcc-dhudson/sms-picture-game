@@ -5,5 +5,6 @@ requests
 flask_socketio
 azure.communication.sms
 azure.storage.blob
+azure.storage.queue
 pytz
 azure.cosmos

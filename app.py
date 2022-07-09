@@ -12,6 +12,8 @@ from requests_oauth2 import OAuth2BearerToken, OAuth2
 from azure.communication.sms import SmsClient
 from azure.cosmos import CosmosClient
 from azure.storage.blob import BlobClient, generate_blob_sas, BlobSasPermissions, generate_container_sas, BlobServiceClient
+from azure.storage.queue import QueueClient
+
 
 
 etc = timezone('America/New_York')
@@ -40,6 +42,9 @@ try:
     BLOB_ACCOUNT_KEY = os.environ['BLOB_ACCOUNT_KEY']
     BLOB_CONTAINER_NAME = os.environ['BLOB_CONTAINER_NAME']
     BLOB_BASE_URI = os.environ['BLOB_BASE_URI']
+    QUEUE_CONNECTION_STRING = os.environ['QUEUE_CONNECTION_STRING']
+    QUEUE_NAME = os.environ['QUEUE_NAME']
+    DEBUG = os.environ['DEBUG']
 except Exception as e:
     print(f"Must supply {e} as environment vairable.")
     sys.exit(1)
@@ -64,6 +69,8 @@ print(app.round)
 cosmos = CosmosClient(COSMOS_URL, credential=COSMOS_KEY)
 database = cosmos.get_database_client(DATABASE_NAME)
 container = database.get_container_client('group-members')
+
+queue_client = QueueClient.from_connection_string(QUEUE_CONNECTION_STRING, QUEUE_NAME)
 
 pco = pypco.PCO(PCO_APP_ID, PCO_SECRET)
 
@@ -258,7 +265,8 @@ def sendtoken(id=None):
                             txt += f"{SELF_BASE_URL}/p/{token}"
                             print(f"{personObj['person_name']}: {txt}")
                             outHtml += f"{group['name']} / {personObj['person_name']} / {phone['e164']}<br />"
-                            sms_response = sms_client.send( from_=FROM_PHONE, to=[phone['e164']], message=txt )
+                            if DEBUG == 'false':
+                                sms_response = sms_client.send( from_=FROM_PHONE, to=[phone['e164']], message=txt )
     return outHtml
 
 
@@ -441,6 +449,7 @@ def submit(token=None):
         return 'Maximum uploads for group reached.', 418
     
     uri = BLOB_BASE_URI + BLOB_CONTAINER_NAME + '/' + token
+    queue_client.send_message(uri)
     out = {
         'id': token + "_" + str(datetime.utcnow()),
         'token': token,
