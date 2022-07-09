@@ -258,7 +258,7 @@ def sendtoken(id=None):
                             txt += f"{SELF_BASE_URL}/p/{token}"
                             print(f"{personObj['person_name']}: {txt}")
                             outHtml += f"{group['name']} / {personObj['person_name']} / {phone['e164']}<br />"
-                            #sms_response = sms_client.send( from_=FROM_PHONE, to=[phone['e164']], message=txt )
+                            sms_response = sms_client.send( from_=FROM_PHONE, to=[phone['e164']], message=txt )
     return outHtml
 
 
