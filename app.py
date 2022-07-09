@@ -283,6 +283,18 @@ def setscore(token):
         container.replace_item(item=sub, body=newSub)
     return 'ok.'
 
+@app.route('/reassign/<token>', methods = ['PATCH'])
+def reassign(token):
+    if not session.get("access_token") or session.get("access_token") not in app.users:
+        return redirect("/auth/callback")
+    data = request.json
+    submission_results = container.query_items('SELECT * FROM s WHERE s.type="submission" AND s.token=@token', parameters=[{'name': '@token', 'value': str(token)}], enable_cross_partition_query=True)
+    for sub in submission_results:
+        newSub = sub
+        newSub['group_id'] = data['group_id']
+        newSub['group_name'] = data['group_name']
+        container.replace_item(item=sub, body=newSub)
+    return 'ok.'   
 
 @app.route('/getscores', methods = ['GET'])
 def getscores():

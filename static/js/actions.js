@@ -1,4 +1,5 @@
 var people
+var groups
 
 $('#alertBtn').click(function () {
     $('#menuModal').modal('show')
@@ -18,6 +19,9 @@ $('#nav-groups').click(function(){
 
 $.get("/list", function(data, status){
     people = data
+})
+$.get("/groups", function(data, status){
+    groups = data
 })
 
 sendModalOriginal = $('#sendModal').html()

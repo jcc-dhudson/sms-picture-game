@@ -39,6 +39,40 @@ window.operateStatus = {
                 $('#scoreModal').modal('hide')
             })
         })
+        $('#reassign').click(function(){
+            $('#scoreModal').modal('hide')
+            $('#reassignModal-title').html('Reassigning ' + row.person_name + '\'s submission')
+            var btnHtml = ''
+            for (i = 0; i < groups.length; i++) {
+                group = groups[i]
+                if(group.group_id == row.group_id){
+                    btnHtml += '<button class="btn btn-primary" type="button">'+group.group_name+'</button>'
+                } else {
+                    btnHtml += '<button class="groupAssign btn btn-secondary" type="button" data-group-name="'+group.group_name+'" data-group-id="'+group.group_id+'">'+group.group_name+'</button>'
+                }
+            }
+            $('#reassignModal-body').html(btnHtml)
+            $('#reassignModal').modal('show')
+            $('.groupAssign').click(function() {
+                group_id = $(this).data('group-id')
+                group_name = $(this).data('group-name')
+                $.ajax('/reassign/' + row.token, {
+                    data : JSON.stringify({'group_id': group_id, 'group_name': group_name}),
+                    contentType : 'application/json',
+                    type : 'PATCH',
+                }).done(function(){
+                    console.log(row.id)
+                    $table.bootstrapTable('updateByUniqueId', {
+                        id: row.id,
+                        row: {
+                            group_name: group_name,
+                            group_id: group_id
+                        }})
+                        $('#reassignModal').modal('hide')
+                })
+                
+            })
+        })
         $('#downloadOriginal').click(function(){
             filename = row.token + '_' + row.original_filename
             download('/getsasuri?download=' + row.token + '&filename=' + filename)
@@ -50,6 +84,8 @@ window.operateRound = {
         $table.bootstrapTable('resetSearch', row.round)
     }
 }
+
+
 
 //
 // table formatters
