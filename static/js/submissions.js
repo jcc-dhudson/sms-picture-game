@@ -11,13 +11,15 @@ var sasKey
 window.operateStatus = {
     'click .status': function (e, value, row, index) {
         $('#scoreModal-submitScore').data('submission-id', row.id)
-        if(row.transform.kind == 'image') {
-            $('#scoreModal-body').html('<img id="put-thumb-uri-here" src="" width="100%" />')
-        }
         $('#newScore').val(row.score)
         $('#scoreModal').modal('show')
         $.get('/getsasuri?rel=thumbs/' + row.transform.thumbnail, function(data){
             $('#put-thumb-uri-here').attr('src', data)
+            if(row.transform.kind == 'image') {
+                $('#scoreModal-body').html('<img  src="'+data+'" width="100%" />')
+            } else if (row.transform.kind == 'video') {
+                $('#scoreModal-body').html('<video width="100%" autoplay controls><source src="'+data+'"></video>')
+            }
         })
         $('#setScore').off()
         $('#setScore').click(function(){

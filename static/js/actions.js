@@ -1,3 +1,5 @@
+var people
+
 $('#alertBtn').click(function () {
     $('#menuModal').modal('show')
 })
@@ -14,16 +16,19 @@ $('#nav-groups').click(function(){
 })
 
 
+$.get("/list", function(data, status){
+    people = data
+})
+
 sendModalOriginal = $('#sendModal').html()
 $('#sendMessageButton').click(function(){
     modalOriginal = $('#sendModal').html()
     message = $('#sendMessageInput').val()
     max_uploads = $('#sendMaxUploads').val()
     console.log(max_uploads)
-    rows = $table.bootstrapTable('getData')
     ids = []
-    for (i = 0; i < rows.length; i++) {
-        ids.push( rows[i].person_id )
+    for (i = 0; i < people.length; i++) {
+        ids.push( people[i].person_id )
     }
     
     console.log(message, ids)
