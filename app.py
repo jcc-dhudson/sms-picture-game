@@ -436,10 +436,11 @@ def playertoken(token=None):
         print(f"{token} is expired: {app.tokens[token]['expiration']}")
         return 'Invalid token', 403
     groupUploadCount = 0
-    if user['max_uploads'] > 0:
-        sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
-        for sub in sub_results:
-            groupUploadCount += 1
+    if user['group_id'] != 'groupunassigneddefault':
+        if user['max_uploads'] > 0:
+            sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
+            for sub in sub_results:
+                groupUploadCount += 1
 
     sas_blob = generate_blob_sas(
         account_name=BLOB_ACCOUNT_NAME,
@@ -459,6 +460,7 @@ def playertoken(token=None):
         'group_upload_max': user['max_uploads'],
         'sas': blob_url
     }
+    print(f"{user['person_name']} wuz here")
     return personObj
 
 @app.route('/submit/<token>', methods = ['POST'])
@@ -472,12 +474,13 @@ def submit(token=None):
 
     
     groupUploadCount = 0
-    if user['max_uploads'] > 0:
-        sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
-        for sub in sub_results:
-            groupUploadCount += 1
-    if groupUploadCount >= user['max_uploads']:
-        return 'Maximum uploads for group reached.', 418
+    if user['group_id'] != 'groupunassigneddefault':
+        if user['max_uploads'] > 0:
+            sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
+            for sub in sub_results:
+                groupUploadCount += 1
+        if groupUploadCount >= user['max_uploads']:
+            return 'Maximum uploads for group reached.', 418
     
     uri = BLOB_BASE_URI + BLOB_CONTAINER_NAME + '/' + token
     queue_client.send_message(uri)
