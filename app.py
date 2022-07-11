@@ -482,7 +482,7 @@ def submit(token=None):
             sub_results = container.query_items("SELECT * FROM s WHERE s.type = \"submission\" and s.group_id = @group_id and s.round = @round", parameters=[{'name': '@group_id', 'value': user['group_id']}, {'name': '@round', 'value': user['round']}], enable_cross_partition_query=True)
             for sub in sub_results:
                 groupUploadCount += 1
-        if groupUploadCount >= user['max_uploads']:
+        if user['max_uploads'] != 0 and groupUploadCount >= user['max_uploads']:
             return 'Maximum uploads for group reached.', 418
     
     uri = BLOB_BASE_URI + BLOB_CONTAINER_NAME + '/' + token
