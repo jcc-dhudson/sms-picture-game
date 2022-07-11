@@ -40,6 +40,8 @@ $('#submit').on('click', async function(e){
     var file = $('#inputFile').prop('files')[0];
     if (file != undefined && 'name' in file) {
         reportStatus("Uploading " + file.name);
+        $("#submit").prop("disabled", true)
+        $("#submit").hide()
         try {
             const promises = [];
             //newFile = new File([blob], file.name, {type: 'image/png'});

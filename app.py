@@ -128,21 +128,24 @@ def getsubmissions():
     else:
         sub_results = container.query_items(f'SELECT * FROM s WHERE s.type="submission"', enable_cross_partition_query=True)
     outArr = []
+    tokenDedupe = []
     for sub in sub_results:
-        transform = {
-            'kind': 'unknown',
-            'thumbnail': 'none',
-            'status': 'not_read'
-        }
-        trans_results = container.query_items(f'SELECT * FROM t WHERE t.type="transform" and t.token = "{sub["token"]}"', enable_cross_partition_query=True)
-        for trans in trans_results:
-            transform = trans
-            transform['status'] = 'done'
-        sub['transform'] = transform
-        if transform['status'] == 'done' and sub['status'] != 'Scored':
-            sub['status'] = 'Ready'
+        if sub['token'] not in tokenDedupe:
+            tokenDedupe.append(sub['token'])
+            transform = {
+                'kind': 'unknown',
+                'thumbnail': 'none',
+                'status': 'not_read'
+            }
+            trans_results = container.query_items(f'SELECT * FROM t WHERE t.type="transform" and t.token = "{sub["token"]}"', enable_cross_partition_query=True)
+            for trans in trans_results:
+                transform = trans
+                transform['status'] = 'done'
+            sub['transform'] = transform
+            if transform['status'] == 'done' and sub['status'] != 'Scored':
+                sub['status'] = 'Ready'
 
-        outArr.append(sub)
+            outArr.append(sub)
 
     return jsonify(outArr)
         
