@@ -75,7 +75,7 @@ $.get("/playertoken/" + token, function(data, status){
     console.log(data)
     tokenInfo = data
     
-    if(tokenInfo.group_upload_count >= tokenInfo.group_upload_max) {
+    if( tokenInfo.group_upload_count != 0 && tokenInfo.group_upload_count >= tokenInfo.group_upload_max) {
         $('#uploadCard').html('<h3 align="center">'+tokenInfo.group_name+' has already submitted the maximum number of submissions.</h3>')
     } else {
         $('#header-userName').html(tokenInfo.person_name)
